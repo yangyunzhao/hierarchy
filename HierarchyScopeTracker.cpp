@@ -2,31 +2,26 @@
 #include <functional>
 #include <string>
 
+// 虚拟根节点的特殊scopeId（内部使用，不对外暴露）
+static const int VIRTUAL_ROOT_ID = -1;
+
 HierarchyScopeTracker::HierarchyScopeTracker()
-    : root_(nullptr), current_(nullptr) {
+    : virtualRoot_(std::make_unique<Node>(VIRTUAL_ROOT_ID, nullptr, true)),
+      current_(nullptr) {
+    // 虚拟根节点始终存在，标记为系统节点
 }
 
 HierarchyScopeTracker::~HierarchyScopeTracker() = default;
 
-void HierarchyScopeTracker::open(int scopeId) {
-    // 创建新节点，父节点为当前节点
-    auto newNode = std::make_unique<Node>(scopeId, current_);
+void HierarchyScopeTracker::open(int scopeId, bool isSystem) {
+    // 创建新节点
+    Node* parentNode = (current_ == nullptr) ? virtualRoot_.get() : current_;
+    auto newNode = std::make_unique<Node>(scopeId, parentNode, isSystem);
     Node* newNodePtr = newNode.get();
 
-    if (current_ == nullptr) {
-        // 当前无活动节点，设置为根节点
-        if (root_ == nullptr) {
-            root_ = std::move(newNode);
-        } else {
-            // 不允许多个根节点
-            throw std::runtime_error("Cannot open multiple root scopes without closing");
-        }
-        current_ = newNodePtr;
-    } else {
-        // 添加为当前节点的子节点
-        current_->children.push_back(std::move(newNode));
-        current_ = newNodePtr;
-    }
+    // 添加到父节点的子节点列表
+    parentNode->children.push_back(std::move(newNode));
+    current_ = newNodePtr;
 }
 
 void HierarchyScopeTracker::close(int scopeId) {
@@ -41,24 +36,40 @@ void HierarchyScopeTracker::close(int scopeId) {
             std::to_string(current_->scopeId) + ", got " + std::to_string(scopeId));
     }
 
-    // 返回父节点
-    current_ = current_->parent;
+    // 返回父节点（如果父节点是虚拟根，则设为nullptr）
+    if (current_->parent == virtualRoot_.get()) {
+        current_ = nullptr;
+    } else {
+        current_ = current_->parent;
+    }
+}
+
+const HierarchyScopeTracker::Node* HierarchyScopeTracker::findUserRoot() const {
+    // 在虚拟根的子节点中查找第一个用户节点
+    // TODO: 未来支持多用户根时，可能需要返回列表或提供索引参数
+    for (const auto& child : virtualRoot_->children) {
+        if (!child->isSystem) {
+            return child.get();
+        }
+    }
+    return nullptr;
 }
 
 int HierarchyScopeTracker::find(const std::vector<int>& levelInfo) const {
-    if (root_ == nullptr) {
-        throw std::runtime_error("Hierarchy is empty");
+    // 从用户根开始查找
+    const Node* userRoot = findUserRoot();
+    if (userRoot == nullptr) {
+        throw std::runtime_error("No user root exists");
     }
 
+    // 如果levelInfo为空，返回用户根
     if (levelInfo.empty()) {
-        throw std::runtime_error("Level info cannot be empty");
+        return userRoot->scopeId;
     }
 
-    // 从根节点开始遍历
-    const Node* node = root_.get();
+    // 从用户根开始，按levelInfo逐层向下查找
+    const Node* node = userRoot;
 
-    // 按levelInfo逐层向下查找
-    // levelInfo[i] 表示在第i+1层选择第几个子节点(从0开始)
     for (size_t i = 0; i < levelInfo.size(); ++i) {
         int index = levelInfo[i];
 
@@ -76,11 +87,7 @@ int HierarchyScopeTracker::find(const std::vector<int>& levelInfo) const {
 }
 
 const HierarchyScopeTracker::Node* HierarchyScopeTracker::findNode(int scopeId) const {
-    if (root_ == nullptr) {
-        return nullptr;
-    }
-
-    // 深度优先搜索查找指定scopeId的节点
+    // 深度优先搜索查找指定scopeId的节点（搜索所有节点，包括系统节点）
     std::function<const Node*(const Node*)> search = [&](const Node* node) -> const Node* {
         if (node->scopeId == scopeId) {
             return node;
@@ -94,7 +101,14 @@ const HierarchyScopeTracker::Node* HierarchyScopeTracker::findNode(int scopeId) 
         return nullptr;
     };
 
-    return search(root_.get());
+    // 从虚拟根的子节点开始搜索
+    for (const auto& child : virtualRoot_->children) {
+        const Node* found = search(child.get());
+        if (found != nullptr) {
+            return found;
+        }
+    }
+    return nullptr;
 }
 
 int HierarchyScopeTracker::find(int startScopeId, const std::vector<int>& levelInfo) const {
@@ -127,17 +141,18 @@ int HierarchyScopeTracker::find(int startScopeId, const std::vector<int>& levelI
 }
 
 int HierarchyScopeTracker::findRoot() const {
-    // 检查层级结构是否为空
-    if (root_ == nullptr) {
-        throw std::runtime_error("Hierarchy is empty");
+    // 返回用户根节点的scopeId
+    const Node* userRoot = findUserRoot();
+    if (userRoot == nullptr) {
+        throw std::runtime_error("No user root exists");
     }
-
-    // 返回根节点的scopeId
-    return root_->scopeId;
+    return userRoot->scopeId;
 }
 
 int HierarchyScopeTracker::getDepth() const {
-    if (root_ == nullptr) {
+    // 从用户根开始计算深度
+    const Node* userRoot = findUserRoot();
+    if (userRoot == nullptr) {
         return 0;
     }
 
@@ -153,16 +168,19 @@ int HierarchyScopeTracker::getDepth() const {
         }
     };
 
-    traverse(root_.get(), 1);
+    traverse(userRoot, 1);
     return maxDepth;
 }
 
 bool HierarchyScopeTracker::isEmpty() const {
-    return root_ == nullptr;
+    // 检查是否存在用户根节点
+    return findUserRoot() == nullptr;
 }
 
 void HierarchyScopeTracker::debugPrint(std::FILE* fp) const {
-    if (root_ == nullptr) {
+    // 只打印用户节点，从用户根开始
+    const Node* userRoot = findUserRoot();
+    if (userRoot == nullptr) {
         std::fprintf(fp, "(empty)\n");
         return;
     }
@@ -186,12 +204,12 @@ void HierarchyScopeTracker::debugPrint(std::FILE* fp) const {
         }
     };
 
-    // 打印根节点
-    std::fprintf(fp, "%d\n", root_->scopeId);
+    // 打印用户根节点
+    std::fprintf(fp, "%d\n", userRoot->scopeId);
 
-    // 打印根节点的子节点
-    for (size_t i = 0; i < root_->children.size(); ++i) {
-        bool isLast = (i == root_->children.size() - 1);
-        print(root_->children[i].get(), "", isLast);
+    // 打印用户根节点的子节点
+    for (size_t i = 0; i < userRoot->children.size(); ++i) {
+        bool isLast = (i == userRoot->children.size() - 1);
+        print(userRoot->children[i].get(), "", isLast);
     }
 }

@@ -133,14 +133,15 @@ BOOST_AUTO_TEST_CASE(TestFindEmpty) {
     BOOST_CHECK_THROW(tracker.find({0}), std::runtime_error);
 }
 
-// Test find with empty level info
+// Test find with empty level info - should return user root
 BOOST_AUTO_TEST_CASE(TestFindEmptyLevelInfo) {
     HierarchyScopeTracker tracker;
 
     tracker.open(100);
     tracker.close(100);
 
-    BOOST_CHECK_THROW(tracker.find({}), std::runtime_error);
+    // Empty levelInfo returns user root
+    BOOST_CHECK_EQUAL(tracker.find({}), 100);
 }
 
 // Test getDepth
@@ -341,6 +342,85 @@ BOOST_AUTO_TEST_CASE(TestFindFromScopeComplex) {
 
     // Find from scope 115
     BOOST_CHECK_EQUAL(tracker.find(115, {0}), 1153);
+}
+
+// Test system nodes - they should be hidden from user perspective
+BOOST_AUTO_TEST_CASE(TestSystemNodes) {
+    HierarchyScopeTracker tracker;
+
+    // Simulate Verilog structure:
+    // $root (virtual, hidden)
+    // ├── $pkg (system node, scopeId=1000)
+    // ├── $unit (system node, scopeId=1001)
+    // └── tb (user node, scopeId=1) <- this is user root
+    //     └── top (scopeId=2)
+    //         └── dut (scopeId=3)
+
+    tracker.open(1000, true);  // $pkg - system node
+    tracker.close(1000);
+
+    tracker.open(1001, true);  // $unit - system node
+    tracker.close(1001);
+
+    tracker.open(1);           // tb - user node (user root)
+      tracker.open(2);         // top
+        tracker.open(3);       // dut
+        tracker.close(3);
+      tracker.close(2);
+    tracker.close(1);
+
+    // findRoot should return tb (first user node), not $pkg
+    BOOST_CHECK_EQUAL(tracker.findRoot(), 1);
+
+    // find should start from user root (tb)
+    BOOST_CHECK_EQUAL(tracker.find({0}), 2);      // top
+    BOOST_CHECK_EQUAL(tracker.find({0, 0}), 3);   // dut
+
+    // isEmpty should check user nodes only
+    BOOST_CHECK(!tracker.isEmpty());
+
+    // getDepth should count from user root
+    BOOST_CHECK_EQUAL(tracker.getDepth(), 3);  // tb -> top -> dut
+}
+
+// Test system nodes only - no user nodes
+BOOST_AUTO_TEST_CASE(TestSystemNodesOnly) {
+    HierarchyScopeTracker tracker;
+
+    // Only system nodes, no user nodes
+    tracker.open(1000, true);  // $pkg
+    tracker.close(1000);
+
+    // Should be empty from user perspective
+    BOOST_CHECK(tracker.isEmpty());
+    BOOST_CHECK_EQUAL(tracker.getDepth(), 0);
+    BOOST_CHECK_THROW(tracker.findRoot(), std::runtime_error);
+    BOOST_CHECK_THROW(tracker.find({0}), std::runtime_error);
+}
+
+// Test mixed system and user nodes with find by scopeId
+BOOST_AUTO_TEST_CASE(TestFindFromSystemNode) {
+    HierarchyScopeTracker tracker;
+
+    // $root (virtual)
+    // ├── $pkg (system, scopeId=1000)
+    // │   └── MyPkg (scopeId=1001)
+    // └── tb (user, scopeId=1)
+    //     └── top (scopeId=2)
+
+    tracker.open(1000, true);  // $pkg
+      tracker.open(1001);      // MyPkg under $pkg (inherits user from context, but parent is system)
+      tracker.close(1001);
+    tracker.close(1000);
+
+    tracker.open(1);           // tb
+      tracker.open(2);         // top
+      tracker.close(2);
+    tracker.close(1);
+
+    // find(scopeId, levelInfo) can still navigate from system nodes
+    BOOST_CHECK_EQUAL(tracker.find(1000, {0}), 1001);  // MyPkg under $pkg
+    BOOST_CHECK_EQUAL(tracker.find(1, {0}), 2);        // top under tb
 }
 
 BOOST_AUTO_TEST_SUITE_END()
