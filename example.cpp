@@ -114,31 +114,15 @@ void testFindFrom(const HierarchyScopeTracker& tracker,
 int main() {
     std::cout << "=== HierarchyScopeTracker Example ===" << std::endl;
     std::cout << std::endl;
-    std::cout << "Tree structure (scopeId):" << std::endl;
-    std::cout << std::endl;
-    std::cout << "1 (root)" << std::endl;
-    std::cout << "├── 10" << std::endl;
-    std::cout << "│   ├── 100" << std::endl;
-    std::cout << "│   │   └── 1000" << std::endl;
-    std::cout << "│   ├── 101" << std::endl;
-    std::cout << "│   └── 102" << std::endl;
-    std::cout << "├── 11" << std::endl;
-    std::cout << "│   ├── 110" << std::endl;
-    std::cout << "│   ├── 111" << std::endl;
-    std::cout << "│   ├── 112" << std::endl;
-    std::cout << "│   ├── 113" << std::endl;
-    std::cout << "│   ├── 114" << std::endl;
-    std::cout << "│   └── 115" << std::endl;
-    std::cout << "│       ├── 1150" << std::endl;
-    std::cout << "│       ├── 1151" << std::endl;
-    std::cout << "│       ├── 1152" << std::endl;
-    std::cout << "│       └── 1153" << std::endl;
-    std::cout << "└── 12" << std::endl;
-    std::cout << std::endl;
 
     // 构建树
     HierarchyScopeTracker tracker;
     buildTree(tracker);
+
+    // 使用debugPrint打印树结构
+    std::cout << "--- debugPrint(stdout) ---" << std::endl;
+    tracker.debugPrint(stdout);
+    std::cout << std::endl;
 
     // 测试findRoot
     std::cout << "--- findRoot ---" << std::endl;
