@@ -74,6 +74,57 @@ int HierarchyScopeTracker::find(const std::vector<int>& levelInfo) const {
     return node->scopeId;
 }
 
+const HierarchyScopeTracker::Node* HierarchyScopeTracker::findNode(int scopeId) const {
+    if (root_ == nullptr) {
+        return nullptr;
+    }
+
+    // 深度优先搜索查找指定scopeId的节点
+    std::function<const Node*(const Node*)> search = [&](const Node* node) -> const Node* {
+        if (node->scopeId == scopeId) {
+            return node;
+        }
+        for (const auto& child : node->children) {
+            const Node* found = search(child.get());
+            if (found != nullptr) {
+                return found;
+            }
+        }
+        return nullptr;
+    };
+
+    return search(root_.get());
+}
+
+int HierarchyScopeTracker::find(int startScopeId, const std::vector<int>& levelInfo) const {
+    // 查找起始节点
+    const Node* node = findNode(startScopeId);
+    if (node == nullptr) {
+        throw std::runtime_error("Scope ID " + std::to_string(startScopeId) + " not found");
+    }
+
+    // 如果levelInfo为空，直接返回起始节点的scopeId
+    if (levelInfo.empty()) {
+        return node->scopeId;
+    }
+
+    // 从起始节点按levelInfo逐层向下查找
+    for (size_t i = 0; i < levelInfo.size(); ++i) {
+        int index = levelInfo[i];
+
+        // 检查索引是否有效
+        if (index < 0 || static_cast<size_t>(index) >= node->children.size()) {
+            throw std::out_of_range("Index " + std::to_string(index) +
+                " out of range at level " + std::to_string(i + 1) +
+                " (available: " + std::to_string(node->children.size()) + " children)");
+        }
+
+        node = node->children[index].get();
+    }
+
+    return node->scopeId;
+}
+
 int HierarchyScopeTracker::findRoot() const {
     // 检查层级结构是否为空
     if (root_ == nullptr) {

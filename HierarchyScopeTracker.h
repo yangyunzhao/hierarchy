@@ -35,6 +35,16 @@ public:
     int find(const std::vector<int>& levelInfo) const;
 
     /**
+     * @brief Find scope by navigating from a given scope using indices.
+     * @param startScopeId Starting scope to navigate from.
+     * @param levelInfo Index path: levelInfo[i] = child index at level i+1.
+     * @return scopeId of the target node.
+     * @throws std::runtime_error if startScopeId not found.
+     * @throws std::out_of_range if index is invalid.
+     */
+    int find(int startScopeId, const std::vector<int>& levelInfo) const;
+
+    /**
      * @brief Find root scope ID.
      * @return scopeId of root node.
      * @throws std::runtime_error if hierarchy is empty.
@@ -63,6 +73,9 @@ private:
         explicit Node(int id, Node* parentNode = nullptr)
             : scopeId(id), parent(parentNode) {}
     };
+
+    /** @brief Find node by scopeId (DFS). */
+    const Node* findNode(int scopeId) const;
 
     std::unique_ptr<Node> root_;  ///< Root node of hierarchy.
     Node* current_;               ///< Current active node.

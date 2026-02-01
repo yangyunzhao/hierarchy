@@ -88,6 +88,29 @@ void testFind(const HierarchyScopeTracker& tracker,
     }
 }
 
+void testFindFrom(const HierarchyScopeTracker& tracker,
+                  int startScopeId,
+                  const std::vector<int>& levelInfo,
+                  int expected) {
+    // 打印查询路径
+    std::cout << "find(" << startScopeId << ", {";
+    for (size_t i = 0; i < levelInfo.size(); ++i) {
+        if (i > 0) std::cout << ", ";
+        std::cout << levelInfo[i];
+    }
+    std::cout << "})";
+
+    int result = tracker.find(startScopeId, levelInfo);
+    std::cout << " = " << std::setw(4) << result;
+
+    // 验证结果
+    if (result == expected) {
+        std::cout << "  [OK]" << std::endl;
+    } else {
+        std::cout << "  [FAIL] expected " << expected << std::endl;
+    }
+}
+
 int main() {
     std::cout << "=== HierarchyScopeTracker Example ===" << std::endl;
     std::cout << std::endl;
@@ -127,8 +150,8 @@ int main() {
     std::cout << "getDepth() = " << tracker.getDepth() << "  [expected: 4]" << std::endl;
     std::cout << std::endl;
 
-    // 测试find
-    std::cout << "--- find queries ---" << std::endl;
+    // 测试find (从root出发)
+    std::cout << "--- find(levelInfo) - from root ---" << std::endl;
     testFind(tracker, {0},          10);
     testFind(tracker, {1},          11);
     testFind(tracker, {2},          12);
@@ -140,6 +163,50 @@ int main() {
     testFind(tracker, {1, 5},       115);
     testFind(tracker, {1, 5, 0},    1150);
     testFind(tracker, {1, 5, 3},    1153);  // 用户示例中的查询
+    std::cout << std::endl;
+
+    // 测试find (从任意scope出发)
+    std::cout << "--- find(scopeId, levelInfo) - from any scope ---" << std::endl;
+    std::cout << std::endl;
+    std::cout << "从节点11出发查找:" << std::endl;
+    std::cout << "11" << std::endl;
+    std::cout << "├── 110  (index 0)" << std::endl;
+    std::cout << "├── ...  (index 1-4)" << std::endl;
+    std::cout << "└── 115  (index 5)" << std::endl;
+    std::cout << "    └── 1153 (index 3)" << std::endl;
+    std::cout << std::endl;
+    testFindFrom(tracker, 11, {0},       110);   // 11的第0个子节点
+    testFindFrom(tracker, 11, {5},       115);   // 11的第5个子节点
+    testFindFrom(tracker, 11, {5, 3},    1153);  // 11 -> 115 -> 1153
+    std::cout << std::endl;
+
+    std::cout << "从节点10出发查找:" << std::endl;
+    std::cout << "10" << std::endl;
+    std::cout << "├── 100  (index 0)" << std::endl;
+    std::cout << "│   └── 1000 (index 0)" << std::endl;
+    std::cout << "├── 101  (index 1)" << std::endl;
+    std::cout << "└── 102  (index 2)" << std::endl;
+    std::cout << std::endl;
+    testFindFrom(tracker, 10, {0},       100);   // 10的第0个子节点
+    testFindFrom(tracker, 10, {0, 0},    1000);  // 10 -> 100 -> 1000
+    testFindFrom(tracker, 10, {1},       101);   // 10的第1个子节点
+    testFindFrom(tracker, 10, {2},       102);   // 10的第2个子节点
+    std::cout << std::endl;
+
+    std::cout << "从节点115出发查找:" << std::endl;
+    std::cout << "115" << std::endl;
+    std::cout << "├── 1150 (index 0)" << std::endl;
+    std::cout << "├── 1151 (index 1)" << std::endl;
+    std::cout << "├── 1152 (index 2)" << std::endl;
+    std::cout << "└── 1153 (index 3)" << std::endl;
+    std::cout << std::endl;
+    testFindFrom(tracker, 115, {0},      1150);
+    testFindFrom(tracker, 115, {3},      1153);
+    std::cout << std::endl;
+
+    std::cout << "空levelInfo返回起始节点本身:" << std::endl;
+    testFindFrom(tracker, 11, {},        11);
+    testFindFrom(tracker, 1153, {},      1153);
 
     std::cout << std::endl;
     std::cout << "=== Example Complete ===" << std::endl;
