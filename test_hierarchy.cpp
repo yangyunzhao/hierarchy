@@ -219,4 +219,22 @@ BOOST_AUTO_TEST_CASE(TestNegativeIndex) {
     BOOST_CHECK_THROW(tracker.find({-1}), std::out_of_range);
 }
 
+// Test findRoot
+BOOST_AUTO_TEST_CASE(TestFindRoot) {
+    HierarchyScopeTracker tracker;
+
+    // Empty tracker should throw
+    BOOST_CHECK_THROW(tracker.findRoot(), std::runtime_error);
+
+    tracker.open(100);
+    BOOST_CHECK_EQUAL(tracker.findRoot(), 100);
+
+    tracker.open(200);
+    BOOST_CHECK_EQUAL(tracker.findRoot(), 100);  // Still returns root
+
+    tracker.close(200);
+    tracker.close(100);
+    BOOST_CHECK_EQUAL(tracker.findRoot(), 100);  // Structure preserved
+}
+
 BOOST_AUTO_TEST_SUITE_END()
