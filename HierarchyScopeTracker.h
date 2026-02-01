@@ -5,30 +5,56 @@
 #include <memory>
 #include <stdexcept>
 
+/**
+ * @brief Tracks hierarchical scope structure using tree.
+ */
 class HierarchyScopeTracker {
 public:
     HierarchyScopeTracker();
     ~HierarchyScopeTracker();
 
-    // Enter a new scope with the given scopeId
+    /**
+     * @brief Enter a new scope.
+     * @param scopeId Unique identifier for this scope.
+     */
     void open(int scopeId);
 
-    // Exit the current scope, scopeId is for validation
+    /**
+     * @brief Exit current scope.
+     * @param scopeId Expected scope ID for validation.
+     * @throws std::runtime_error if scopeId mismatches.
+     */
     void close(int scopeId);
 
-    // Find a scope by traversing down from root using level indices
-    // levelInfo[0] = index of child at level 1
-    // levelInfo[1] = index of child at level 2, etc.
-    // Returns the scopeId of the found node
+    /**
+     * @brief Find scope by navigating from root using indices.
+     * @param levelInfo Index path: levelInfo[i] = child index at level i+1.
+     * @return scopeId of the target node.
+     * @throws std::out_of_range if index is invalid.
+     */
     int find(const std::vector<int>& levelInfo) const;
 
-    // Get the depth of the hierarchy (number of levels)
+    /**
+     * @brief Find root scope ID.
+     * @return scopeId of root node.
+     * @throws std::runtime_error if hierarchy is empty.
+     */
+    int findRoot() const;
+
+    /**
+     * @brief Get maximum depth of hierarchy.
+     * @return Number of levels (0 if empty).
+     */
     int getDepth() const;
 
-    // Check if the tracker is empty (no scopes opened)
+    /**
+     * @brief Check if hierarchy is empty.
+     * @return true if no scopes opened.
+     */
     bool isEmpty() const;
 
 private:
+    /** @brief Tree node structure. */
     struct Node {
         int scopeId;
         std::vector<std::unique_ptr<Node>> children;
@@ -38,8 +64,8 @@ private:
             : scopeId(id), parent(parentNode) {}
     };
 
-    std::unique_ptr<Node> root_;
-    Node* current_;
+    std::unique_ptr<Node> root_;  ///< Root node of hierarchy.
+    Node* current_;               ///< Current active node.
 };
 
 #endif // HIERARCHY_SCOPE_TRACKER_H
