@@ -237,4 +237,110 @@ BOOST_AUTO_TEST_CASE(TestFindRoot) {
     BOOST_CHECK_EQUAL(tracker.findRoot(), 100);  // Structure preserved
 }
 
+// Test find from arbitrary scope
+BOOST_AUTO_TEST_CASE(TestFindFromScope) {
+    HierarchyScopeTracker tracker;
+
+    // Build tree:
+    //        1
+    //      / | \
+    //     2  3  4
+    //    /|  |
+    //   5 6  7
+    //   |
+    //   8
+
+    tracker.open(1);
+      tracker.open(2);
+        tracker.open(5);
+          tracker.open(8);
+          tracker.close(8);
+        tracker.close(5);
+        tracker.open(6);
+        tracker.close(6);
+      tracker.close(2);
+      tracker.open(3);
+        tracker.open(7);
+        tracker.close(7);
+      tracker.close(3);
+      tracker.open(4);
+      tracker.close(4);
+    tracker.close(1);
+
+    // Find from root (same as find(levelInfo))
+    BOOST_CHECK_EQUAL(tracker.find(1, {0}), 2);
+    BOOST_CHECK_EQUAL(tracker.find(1, {1}), 3);
+    BOOST_CHECK_EQUAL(tracker.find(1, {0, 0}), 5);
+
+    // Find from scope 2
+    BOOST_CHECK_EQUAL(tracker.find(2, {0}), 5);    // first child of 2
+    BOOST_CHECK_EQUAL(tracker.find(2, {1}), 6);    // second child of 2
+    BOOST_CHECK_EQUAL(tracker.find(2, {0, 0}), 8); // child of 5
+
+    // Find from scope 3
+    BOOST_CHECK_EQUAL(tracker.find(3, {0}), 7);    // first child of 3
+
+    // Find from scope 5
+    BOOST_CHECK_EQUAL(tracker.find(5, {0}), 8);    // first child of 5
+
+    // Find with empty levelInfo returns the start scope itself
+    BOOST_CHECK_EQUAL(tracker.find(2, {}), 2);
+    BOOST_CHECK_EQUAL(tracker.find(8, {}), 8);
+}
+
+// Test find from scope - error cases
+BOOST_AUTO_TEST_CASE(TestFindFromScopeErrors) {
+    HierarchyScopeTracker tracker;
+
+    tracker.open(1);
+      tracker.open(2);
+      tracker.close(2);
+    tracker.close(1);
+
+    // Scope not found
+    BOOST_CHECK_THROW(tracker.find(999, {0}), std::runtime_error);
+
+    // Index out of range
+    BOOST_CHECK_THROW(tracker.find(1, {1}), std::out_of_range);  // only 1 child
+    BOOST_CHECK_THROW(tracker.find(2, {0}), std::out_of_range);  // no children
+}
+
+// Test find from scope with complex tree (from user requirement)
+BOOST_AUTO_TEST_CASE(TestFindFromScopeComplex) {
+    HierarchyScopeTracker tracker;
+
+    // Build tree from example:
+    // 1 (root)
+    // ├── 10
+    // │   └── 100
+    // └── 11
+    //     ├── 110
+    //     └── 115
+    //         └── 1153
+
+    tracker.open(1);
+      tracker.open(10);
+        tracker.open(100);
+        tracker.close(100);
+      tracker.close(10);
+      tracker.open(11);
+        tracker.open(110);
+        tracker.close(110);
+        tracker.open(115);
+          tracker.open(1153);
+          tracker.close(1153);
+        tracker.close(115);
+      tracker.close(11);
+    tracker.close(1);
+
+    // Find from root
+    BOOST_CHECK_EQUAL(tracker.find(1, {1, 1, 0}), 1153);
+
+    // Find from scope 11
+    BOOST_CHECK_EQUAL(tracker.find(11, {1, 0}), 1153);
+
+    // Find from scope 115
+    BOOST_CHECK_EQUAL(tracker.find(115, {0}), 1153);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
