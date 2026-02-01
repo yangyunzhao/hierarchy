@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <stdexcept>
+#include <cstdio>
 
 /**
  * @brief Tracks hierarchical scope structure using tree.
@@ -62,6 +63,12 @@ public:
      * @return true if no scopes opened.
      */
     bool isEmpty() const;
+
+    /**
+     * @brief Print hierarchy tree structure for debugging.
+     * @param fp Output file pointer (e.g., stdout, stderr, or file).
+     */
+    void debugPrint(std::FILE* fp) const;
 
 private:
     /** @brief Tree node structure. */

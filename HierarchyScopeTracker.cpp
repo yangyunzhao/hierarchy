@@ -1,5 +1,6 @@
 #include "HierarchyScopeTracker.h"
 #include <functional>
+#include <string>
 
 HierarchyScopeTracker::HierarchyScopeTracker()
     : root_(nullptr), current_(nullptr) {
@@ -158,4 +159,39 @@ int HierarchyScopeTracker::getDepth() const {
 
 bool HierarchyScopeTracker::isEmpty() const {
     return root_ == nullptr;
+}
+
+void HierarchyScopeTracker::debugPrint(std::FILE* fp) const {
+    if (root_ == nullptr) {
+        std::fprintf(fp, "(empty)\n");
+        return;
+    }
+
+    // 递归打印树结构
+    // prefix: 当前行前缀, isLast: 是否为父节点的最后一个子节点
+    std::function<void(const Node*, const std::string&, bool)> print =
+        [&](const Node* node, const std::string& prefix, bool isLast) {
+        // 打印当前节点
+        std::fprintf(fp, "%s", prefix.c_str());
+        std::fprintf(fp, "%s", isLast ? "└── " : "├── ");
+        std::fprintf(fp, "%d\n", node->scopeId);
+
+        // 计算子节点的前缀
+        std::string childPrefix = prefix + (isLast ? "    " : "│   ");
+
+        // 递归打印子节点
+        for (size_t i = 0; i < node->children.size(); ++i) {
+            bool childIsLast = (i == node->children.size() - 1);
+            print(node->children[i].get(), childPrefix, childIsLast);
+        }
+    };
+
+    // 打印根节点
+    std::fprintf(fp, "%d\n", root_->scopeId);
+
+    // 打印根节点的子节点
+    for (size_t i = 0; i < root_->children.size(); ++i) {
+        bool isLast = (i == root_->children.size() - 1);
+        print(root_->children[i].get(), "", isLast);
+    }
 }
